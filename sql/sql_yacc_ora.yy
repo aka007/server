@@ -2389,8 +2389,8 @@ create:
           {
             Lex->pop_select(); //main select
           }
-        | create_or_replace USER_SYM opt_if_not_exists clear_privileges grant_list
-          opt_require_clause opt_resource_options
+        | create_or_replace USER_SYM opt_if_not_exists clear_privileges
+          grant_list opt_require_clause opt_resource_options
           {
             if (unlikely(Lex->set_command_with_check(SQLCOM_CREATE_USER,
                                                      $1 | $3)))
@@ -16581,14 +16581,14 @@ opt_for_user:
         ;
 
 text_or_password:
-          TEXT_STRING { Lex->definer->pwhash= $1;}
+          TEXT_STRING { Lex->definer->auth= $1;}
         | PASSWORD_SYM '(' TEXT_STRING ')' { Lex->definer->pwtext= $3; }
         | OLD_PASSWORD_SYM '(' TEXT_STRING ')'
           {
             Lex->definer->pwtext= $3;
-            Lex->definer->pwhash.str= Item_func_password::alloc(thd,
+            Lex->definer->auth.str= Item_func_password::alloc(thd,
                                    $3.str, $3.length, Item_func_password::OLD);
-            Lex->definer->pwhash.length=  SCRAMBLED_PASSWORD_CHAR_LENGTH_323;
+            Lex->definer->auth.length=  SCRAMBLED_PASSWORD_CHAR_LENGTH_323;
           }
         ;
 
@@ -17172,13 +17172,11 @@ grant_user:
           {
             $$= $1;
             $1->pwtext= $4;
-            if (unlikely(Lex->sql_command == SQLCOM_REVOKE))
-              MYSQL_YYABORT;
           }
         | user IDENTIFIED_SYM BY PASSWORD_SYM TEXT_STRING
           { 
             $$= $1; 
-            $1->pwhash= $5;
+            $1->auth= $5;
           }
         | user IDENTIFIED_SYM via_or_with ident_or_text
           {
@@ -17186,11 +17184,19 @@ grant_user:
             $1->plugin= $4;
             $1->auth= empty_clex_str;
           }
-        | user IDENTIFIED_SYM via_or_with ident_or_text using_or_as TEXT_STRING_sys
+        | user IDENTIFIED_SYM via_or_with ident_or_text using_or_as
+          TEXT_STRING_sys
           {
             $$= $1;
             $1->plugin= $4;
             $1->auth= $6;
+          }
+        | user IDENTIFIED_SYM via_or_with ident_or_text using_or_as
+          PASSWORD_SYM '(' TEXT_STRING ')'
+          {
+            $$= $1;
+            $1->plugin= $4;
+            $1->pwtext= $8;
           }
         | user_or_role
           { $$= $1; }
